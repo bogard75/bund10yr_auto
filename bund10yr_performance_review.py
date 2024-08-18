@@ -76,6 +76,58 @@ def annotate_trade_log(tr):
                      arrowprops=dict(facecolor='blue', shrink=0.05),
                      fontsize=8, color='blue')
 
+
+# Add rectangular patch
+import matplotlib.patches as patches
+
+def rect_patch_candle():
+    start = '2024-08-09 09:15'
+    enddt = '2024-08-10 04:10'
+    flt = (df_1m.index >= start) & (df_1m.index <= enddt)
+    
+    # Filter and plot the candlestick chart
+    fig, ax = plt.subplots(figsize=(12, 6))
+    mavs = [mpf.make_addplot(df_1m.loc[flt]['m60'], color='g', ax=ax),
+            mpf.make_addplot(df_1m.loc[flt]['m120'], color='r', ax=ax)]
+    mpf.plot(df_1m.loc[flt], type='candle', ax=ax, style='charles', addplot=mavs)
+    
+    # Extract trade data within the time range
+    trades_in_range = df_tr[(df_tr['진입일시'] >= start) & (df_tr['진입일시'] <= enddt)]
+    
+    for _, trade in trades_in_range.iterrows():
+        entry_time = trade['진입일시']
+        entry_price = trade['진입가격']
+        result = trade['거래결과']
+        exit_price = entry_price + 0.03 if trade['거래구분'] == '매수' else entry_price - 0.03
+        
+        # Define the time range for the rectangle
+        entry_idx = df_1m.index.get_loc(entry_time, method='nearest')
+        if entry_idx + 1 >= len(df_1m):
+            continue
+        
+        # Find the index where the price first meets the exit price
+        df_range = df_1m.iloc[entry_idx:]
+        high_exit_idx = df_range[df_range['High'] >= exit_price].index.min()
+        low_exit_idx = df_range[df_range['Low'] <= exit_price].index.max()
+        
+        if pd.isna(high_exit_idx) or pd.isna(low_exit_idx):
+            continue
+        
+        end_time = min(high_exit_idx, low_exit_idx)
+        
+        # Plot the rectangle
+        ax.add_patch(patches.Rectangle(
+            (entry_time, min(entry_price, exit_price)),
+            (end_time - entry_time).total_seconds() / 60 / 60,  # Width in hours
+            abs(entry_price - exit_price),
+            color='blue', alpha=0.3, edgecolor='blue'
+        ))
+
+    plt.show()
+
+rect_patch_candle()
+
+
 # save chart
 
 print(df_1m.head())
